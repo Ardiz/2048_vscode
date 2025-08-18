@@ -279,6 +279,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         merged = true;
                         nextCell.merged = true;
                         nextCell.value *= 2;
+                        cell.value = 0; // Clear source cell immediately during merge
                         updateScore(nextCell.value);
                         
                         // Check for win
