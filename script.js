@@ -10,6 +10,8 @@ document.addEventListener("DOMContentLoaded", function() {
     let gameOver = false;
     let gameWon = false;
     let continueAfterWin = false;
+    let tileIdCounter = 0;
+    let activeTiles = new Map(); // Track active tiles with their DOM elements
     
     // HTML elements
     const gridContainer = document.getElementById('grid-container');
@@ -31,10 +33,55 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }
     
+    // Helper function to get tile position in pixels
+    function getTilePosition(x, y) {
+        // Check if we're on a mobile screen
+        const isMobile = window.innerWidth <= 520;
+        
+        if (isMobile) {
+            const cellSize = 280 / 4; // 70px including gap
+            const gap = 10;
+            return {
+                x: x * cellSize + gap,
+                y: y * cellSize + gap
+            };
+        } else {
+            const cellSize = 450 / 4; // 112.5px including gap
+            const gap = 15;
+            return {
+                x: x * cellSize + gap,
+                y: y * cellSize + gap
+            };
+        }
+    }
+    
+    // Helper function to create a tile element
+    function createTileElement(value, x, y) {
+        const tile = document.createElement('div');
+        const tileId = ++tileIdCounter;
+        
+        tile.classList.add('tile', `tile-${value}`);
+        tile.textContent = value;
+        tile.setAttribute('data-tile-id', tileId);
+        
+        const position = getTilePosition(x, y);
+        tile.style.transform = `translate(${position.x}px, ${position.y}px)`;
+        
+        return { element: tile, id: tileId };
+    }
+    
+    // Helper function to animate tile to new position
+    function animateTileToPosition(tileElement, x, y) {
+        const position = getTilePosition(x, y);
+        tileElement.style.transform = `translate(${position.x}px, ${position.y}px)`;
+    }
+    
     // Initialize the game board
     function initializeGrid() {
         gridContainer.innerHTML = '';
         grid = [];
+        activeTiles.clear();
+        tileIdCounter = 0;
         
         // Create the grid cells
         for (let i = 0; i < CELL_COUNT; i++) {
@@ -45,7 +92,8 @@ document.addEventListener("DOMContentLoaded", function() {
                 value: 0,
                 element: cell,
                 x: i % GRID_SIZE,
-                y: Math.floor(i / GRID_SIZE)
+                y: Math.floor(i / GRID_SIZE),
+                tileId: null
             });
         }
         
@@ -75,35 +123,40 @@ document.addEventListener("DOMContentLoaded", function() {
             const randomCell = availableCells[Math.floor(Math.random() * availableCells.length)];
             
             // 90% chance for a 2, 10% chance for a 4
-            randomCell.value = Math.random() < 0.9 ? 2 : 4;
+            const value = Math.random() < 0.9 ? 2 : 4;
+            randomCell.value = value;
             
             // Create and display the tile
-            const tile = document.createElement('div');
-            tile.classList.add('tile', `tile-${randomCell.value}`);
-            tile.textContent = randomCell.value;
-            tile.style.opacity = 0;
+            const tileData = createTileElement(value, randomCell.x, randomCell.y);
+            randomCell.tileId = tileData.id;
+            activeTiles.set(tileData.id, tileData.element);
             
-            // Add the tile to the grid cell
-            randomCell.element.appendChild(tile);
+            // Add to grid container and animate appearance
+            tileData.element.style.opacity = 0;
+            tileData.element.style.transform += ' scale(0)';
+            gridContainer.appendChild(tileData.element);
             
             // Animate the tile appearance
             setTimeout(() => {
-                tile.style.opacity = 1;
+                tileData.element.style.opacity = 1;
+                tileData.element.style.transform = tileData.element.style.transform.replace(' scale(0)', ' scale(1)');
             }, 50);
         }
     }
     
-    // Update the visual representation of the tiles
-    function updateTiles() {
-        grid.forEach(cell => {
-            cell.element.innerHTML = '';
-            if (cell.value > 0) {
-                const tile = document.createElement('div');
-                tile.classList.add('tile', `tile-${cell.value}`);
-                tile.textContent = cell.value;
-                cell.element.appendChild(tile);
-            }
-        });
+    // Update tile visual properties (color, text) without affecting position
+    function updateTileAppearance(tileElement, value) {
+        tileElement.className = `tile tile-${value}`;
+        tileElement.textContent = value;
+    }
+    
+    // Remove a tile from the game
+    function removeTile(tileId) {
+        const tileElement = activeTiles.get(tileId);
+        if (tileElement) {
+            tileElement.remove();
+            activeTiles.delete(tileId);
+        }
     }
     
     // Check if the game is over (no more moves possible)
@@ -191,6 +244,8 @@ document.addEventListener("DOMContentLoaded", function() {
         if (vector.y === 1) traversals.y = traversals.y.reverse();
         
         let moved = false;
+        const animations = []; // Store animation promises
+        const tilesToRemove = []; // Store tiles to remove after merging
         
         // Move each tile
         traversals.y.forEach(y => {
@@ -201,6 +256,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 let newX = x;
                 let newY = y;
                 let nextX, nextY;
+                let merged = false;
                 
                 // Keep moving in the vector direction until we hit a boundary or another tile
                 do {
@@ -220,24 +276,59 @@ document.addEventListener("DOMContentLoaded", function() {
                         newX = nextX;
                         newY = nextY;
                         moved = true;
+                        merged = true;
                         nextCell.merged = true;
                         nextCell.value *= 2;
-                        cell.value = 0;
                         updateScore(nextCell.value);
                         
                         // Check for win
                         if (nextCell.value === 2048) {
                             checkWin();
                         }
+                        break;
+                    } else {
+                        break;
                     }
-                } while (getCell(nextX, nextY) && getCell(nextX, nextY).value === 0);
+                } while (true);
                 
                 if (newX !== x || newY !== y) {
-                    // Update the cell position
-                    const targetCell = getCell(newX, newY);
-                    if (cell.value !== 0 && targetCell.value === 0) {
-                        targetCell.value = cell.value;
+                    // Animate the tile movement
+                    const tileElement = activeTiles.get(cell.tileId);
+                    if (tileElement) {
+                        animateTileToPosition(tileElement, newX, newY);
+                        
+                        if (merged) {
+                            // Handle merge: remove the moving tile and update the target tile
+                            const targetCell = getCell(newX, newY);
+                            const targetTileElement = activeTiles.get(targetCell.tileId);
+                            
+                            if (targetTileElement) {
+                                // Update target tile appearance
+                                setTimeout(() => {
+                                    updateTileAppearance(targetTileElement, targetCell.value);
+                                    targetTileElement.style.transform += ' scale(1.1)';
+                                    setTimeout(() => {
+                                        targetTileElement.style.transform = targetTileElement.style.transform.replace(' scale(1.1)', '');
+                                    }, 100);
+                                }, 200);
+                            }
+                            
+                            // Remove the moving tile after animation
+                            setTimeout(() => {
+                                removeTile(cell.tileId);
+                            }, 200);
+                            
+                            tilesToRemove.push(cell.tileId);
+                        } else {
+                            // Update cell tracking for non-merge moves
+                            const targetCell = getCell(newX, newY);
+                            targetCell.value = cell.value;
+                            targetCell.tileId = cell.tileId;
+                        }
+                        
+                        // Clear the original cell
                         cell.value = 0;
+                        cell.tileId = null;
                     }
                 }
             });
@@ -249,12 +340,14 @@ document.addEventListener("DOMContentLoaded", function() {
         });
         
         if (moved) {
-            addRandomTile();
-            updateTiles();
-            
-            if (checkGameOver()) {
-                setGameOver();
-            }
+            // Add new tile after animation completes
+            setTimeout(() => {
+                addRandomTile();
+                
+                if (checkGameOver()) {
+                    setGameOver();
+                }
+            }, 250);
         }
         
         return moved;
