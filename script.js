@@ -317,12 +317,15 @@ document.addEventListener("DOMContentLoaded", function() {
                                 }, 200);
                             }
                             
+                            // Save the tileId before nullifying cell.tileId
+                            const tileIdToRemove = cell.tileId;
+                            
                             // Remove the moving tile after animation
                             setTimeout(() => {
-                                removeTile(cell.tileId);
+                                removeTile(tileIdToRemove);
                             }, 200);
                             
-                            tilesToRemove.push(cell.tileId);
+                            tilesToRemove.push(tileIdToRemove);
                         } else {
                             // Update cell tracking for non-merge moves
                             const targetCell = getCell(newX, newY);
