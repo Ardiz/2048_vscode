@@ -12,6 +12,7 @@ document.addEventListener("DOMContentLoaded", function() {
     let continueAfterWin = false;
     let tileIdCounter = 0;
     let activeTiles = new Map(); // Track active tiles with their DOM elements
+    let moveInProgress = false; // Prevent rapid moves during animations
     
     // HTML elements
     const gridContainer = document.getElementById('grid-container');
@@ -216,9 +217,11 @@ document.addEventListener("DOMContentLoaded", function() {
     
     // Move tiles in a specific direction
     function moveTiles(direction) {
-        if (gameOver || (gameWon && !continueAfterWin)) {
+        if (gameOver || (gameWon && !continueAfterWin) || moveInProgress) {
             return false;
         }
+        
+        moveInProgress = true;
         
         // Define the traversal order based on direction
         const vector = {
@@ -327,8 +330,10 @@ document.addEventListener("DOMContentLoaded", function() {
                             targetCell.tileId = cell.tileId;
                         }
                         
-                        // Clear the original cell
-                        cell.value = 0;
+                        // Clear the original cell (already cleared for merges)
+                        if (!merged) {
+                            cell.value = 0;
+                        }
                         cell.tileId = null;
                     }
                 }
@@ -348,7 +353,11 @@ document.addEventListener("DOMContentLoaded", function() {
                 if (checkGameOver()) {
                     setGameOver();
                 }
+                
+                moveInProgress = false; // Allow next move
             }, 250);
+        } else {
+            moveInProgress = false; // Allow next move immediately if no movement occurred
         }
         
         return moved;
@@ -377,6 +386,7 @@ document.addEventListener("DOMContentLoaded", function() {
         gameOver = false;
         gameWon = false;
         continueAfterWin = false;
+        moveInProgress = false; // Reset move blocking
         messageElement.className = 'game-message';
         
         initializeGrid();
