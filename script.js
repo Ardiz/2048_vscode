@@ -39,18 +39,18 @@ document.addEventListener("DOMContentLoaded", function() {
         const isMobile = window.innerWidth <= 520;
         
         if (isMobile) {
-            const cellSize = 280 / 4; // 70px including gap
             const gap = 10;
+            const cellSize = (280 - 3 * gap) / 4; // 62.5px actual cell size
             return {
-                x: x * cellSize + gap,
-                y: y * cellSize + gap
+                x: x * (cellSize + gap),
+                y: y * (cellSize + gap)
             };
         } else {
-            const cellSize = 450 / 4; // 112.5px including gap
             const gap = 15;
+            const cellSize = (450 - 3 * gap) / 4; // 101.25px actual cell size
             return {
-                x: x * cellSize + gap,
-                y: y * cellSize + gap
+                x: x * (cellSize + gap),
+                y: y * (cellSize + gap)
             };
         }
     }
